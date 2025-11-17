@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recipe Backlog</title>
+  <style>
+/* ============ CSS RESET & VARIABLES ============ */
+*,
+*::before,
+*::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; }
+:root {
+  /* Dark theme (default) */
+  --bg: #0f1216;
+  --surface: #151a21;
+  --elev-2: #1b212a;
+  --text: #e6eaf0;
+  --muted: #98a2b3;
+  --primary: #4f46e5;
+  --border: #263141;
+
+  --type-main: #0ea5e9;
+  --type-side: #f59e0b;
+  --type-one: #8b5cf6;
+
+  --chip-bg: #202736;
+  --chip-border: #2a3447;
+  --good: #22c55e;
+  --danger: #ef4444;
+}
+/* Light theme overrides */
+:root[data-theme="light"] {
+  --bg: #f6f8fb;
+  --surface: #ffffff;
+  --elev-2: #f2f4f7;
+  --text: #0b1220;
+  --muted: #667085;
+  --primary: #4f46e5;
+  --border: #d0d5dd;
+
+  --chip-bg: #f3f4f6;
+  --chip-border: #e5e7eb;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+}
+
+/* ============ HEADER ============ */
+.app-header {
+  position: sticky; top: 0; z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; gap: 10px; align-items: center; }
+.brand .logo { font-size: 24px; }
+.brand h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 0.2px; }
+
+.tabs { display: flex; gap: 6px; }
+.tab {
+  background: transparent; color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+}
+.tab.active { background: var(--elev-2); border-color: var(--chip-border); }
+
+.actions { display: flex; gap: 8px; }
+.primary, .ghost, .danger, .icon {
+  border: 1px solid var(--border); background: var(--elev-2);
+  color: var(--text); padding: 8px 12px; border-radius: 10px; cursor: pointer;
+}
+.primary { background: var(--primary); border-color: transparent; color: white; }
+.ghost { background: transparent; }
+.danger { background: transparent; border-color: var(--danger); color: var(--danger); }
+.icon { padding: 6px 8px; }
+
+main { padding: 20px 24px; max-width: 1200px; margin: 0 auto; }
+
+/* ============ UTILITIES ============ */
+.toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+input[type="search"], input[type="text"], input[type="url"], textarea {
+  width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  border-radius: 10px; padding: 10px 12px;
+}
+.chip-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-group.small .chip { padding: 4px 8px; font-size: 12px; }
+.chip {
+  padding: 6px 10px; border-radius: 999px; border: 1px solid var(--chip-border);
+  background: var(--chip-bg); color: var(--text); cursor: pointer;
+}
+:root[data-theme="light"] .chip { background: var(--chip-bg); color: var(--text); }
+.chip.ghost { background: transparent; }
+.chip.active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary) inset; }
+
+.grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.card {
+  position: relative; outline: none;
+  background: var(--surface);
+  border: 1px solid var(--border); border-radius: 12px; padding: 12px 12px 10px 12px;
+  display: grid; gap: 8px; min-height: 120px; cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.card:hover { transform: translateY(-2px); box-shadow: 0 4px 18px rgba(0,0,0,.15); }
+.card .color {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 6px; border-top-left-radius: 12px; border-bottom-left-radius: 12px;
+}
+.card .title { margin: 0 0 2px 0; font-size: 16px; letter-spacing: .2px; }
+.card .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.card .icons { margin-top: auto; display: flex; gap: 8px; color: var(--muted); font-size: 12px; }
+
+.badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--chip-border); background: #1a212e; }
+:root[data-theme="light"] .badge { background: #f2f4f7; }
+
+/* Tag editor */
+.tag-editor { display: grid; grid-template-columns: 1fr; gap: 6px; grid-column: span 2; }
+.chips-line { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px; border-radius: 999px; border: 1px solid var(--chip-border); background: #1a212e; font-size: 12px;
+}
+:root[data-theme="light"] .tag-chip { background: #eef2ff; }
+.tag-chip button { border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.card .chips .tag-chip { opacity: .9; }
+
+/* ============ CALENDAR LAYOUT ============ */
+.calendar-toolbar {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 10px;
+}
+.week-controls { display: flex; align-items: center; gap: 8px; }
+.week-label { font-weight: 600; letter-spacing: .3px; }
+.calendar-layout { display: grid; grid-template-columns: 280px 1fr; gap: 16px; }
+.sidebar {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px; height: calc(100vh - 220px); overflow: auto; position: sticky; top: 92px;
+}
+.sidebar h2 { font-size: 16px; margin: 2px 0 8px; }
+.list { display: grid; gap: 8px; }
+
+.mini-card {
+  display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 8px;
+  border: 1px solid var(--chip-border); background: var(--elev-2); border-radius: 10px; padding: 6px 8px;
+  cursor: grab;
+}
+.mini-card:active { cursor: grabbing; }
+.mini-card .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.mini-card .remove { display: none; }
+.mini-card:hover .remove { display: inline-block; }
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+.day-col {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px; min-height: 380px;
+  display: grid; grid-template-rows: auto 1fr 1fr 1fr; gap: 8px;
+}
+.day-header { font-weight: 600; color: var(--muted); display: flex; justify-content: space-between; align-items:center; }
+.slot {
+  background: var(--elev-2); border: 1px dashed var(--chip-border); border-radius: 10px; padding: 6px;
+  min-height: 90px; display: grid; align-content: start; gap: 6px;
+}
+.slot.over { outline: 2px solid var(--primary); }
+
+.hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+
+/* ============ FILTERS VIEW ============ */
+.filters-layout { display: grid; grid-template-columns: 300px 1fr; gap: 16px; }
+.filters-pane, .filters-results {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px;
+}
+.filters-pane h2, .filters-results h2 { font-size: 16px; margin: 4px 0 8px; }
+.form { display: grid; gap: 8px; }
+.form.two-col { grid-template-columns: 1fr 1fr; column-gap: 16px; }
+.form.two-col > label { align-self: end; }
+.form.two-col > input[type="text"], .form.two-col > input[type="url"], .form.two-col > textarea { grid-column: 1 / -1; } /* full width */
+.form.two-col > .row, .form.two-col > .tag-editor { grid-column: 1 / -1; } /* keep groups close to Name */
+.form .row { display: flex; gap: 12px; flex-wrap: wrap; }
+.group-label { color: var(--muted); font-size: 12px; }
+
+.swatch { border: 1px dashed var(--chip-border); border-radius: 999px; padding: 6px 10px; cursor: pointer; }
+.swatch.main { box-shadow: inset 0 0 0 2px var(--type-main); }
+.swatch.side { box-shadow: inset 0 0 0 2px var(--type-side); }
+.swatch.one { box-shadow: inset 0 0 0 2px var(--type-one); }
+
+.screenshot-preview { display: grid; gap: 6px; grid-column: span 2; }
+.screenshot-preview img { max-width: 340px; height: auto; border-radius: 10px; border: 1px solid var(--chip-border); }
+
+/* ============ DIALOG ============ */
+dialog {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 12px;
+  width: min(840px, 92vw);
+  max-width: 92vw;
+  padding: 0;
+}
+dialog::backdrop { background: rgba(5,8,12,.6); backdrop-filter: blur(2px); }
+.dialog-header {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 16px 20px; border-bottom: 1px solid var(--border);
+}
+.form { padding: 16px 20px; } /* extra left padding in the dialog */
+.dialog-footer {
+  display: flex; gap: 8px; justify-content: flex-end; padding: 12px 20px; border-top: 1px solid var(--border);
+}
+
+/* ============ RESPONSIVE ============ */
+@media (max-width: 980px) {
+  .calendar-layout { grid-template-columns: 1fr; }
+  .sidebar { position: relative; height: auto; top: auto; }
+}
+
+.hidden { display: none !important; }
+
+</style>
+</head>
+<body>
+  <header class="app-header" role="banner">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">🍳</span>
+      <h1>Recipe Backlog</h1>
+    </div>
+    <nav class="tabs" aria-label="Views">
+      <button class="tab active" data-tab="backlog" aria-controls="view-backlog" aria-selected="true">Backlog</button>
+      <button class="tab" data-tab="calendar" aria-controls="view-calendar" aria-selected="false">Calendar</button>
+      <button class="tab" data-tab="filters" aria-controls="view-filters" aria-selected="false">Filters</button>
+    </nav>
+    <div class="actions">
+      <button id="toggleViewBtn" class="ghost" title="Switch between Backlog and Calendar" aria-label="Switch view">Go to Calendar</button>
+      <button id="themeToggle" class="icon" title="Toggle theme" aria-label="Toggle theme">🌓</button>
+      <button id="addFoodBtn" class="primary">＋ Add food</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- BACKLOG VIEW -->
+    <section id="view-backlog" class="view active" aria-label="Backlog">
+      <div class="toolbar">
+        <input id="searchBacklog" type="search" placeholder="Search recipes…" aria-label="Search backlog" />
+        <div class="chip-group" role="group" aria-label="Quick filters">
+          <button class="chip" data-filter="type:main">Main</button>
+          <button class="chip" data-filter="type:side">Side</button>
+          <button class="chip" data-filter="type:one">One-meal</button>
+          <button class="chip" data-filter="tag:breakfast">Breakfast</button>
+          <button class="chip" data-filter="tag:lunch">Lunch</button>
+          <button class="chip" data-filter="tag:dinner">Dinner</button>
+          <button class="chip" data-filter="tag:dessert">Dessert</button>
+          <button class="chip" data-filter="flag:thermomix">Thermomix</button>
+          <button class="chip" data-filter="flag:cooked">Cooked</button>
+          <button class="chip" data-filter="flag:want">Want to cook</button>
+          <button id="clearFiltersBacklog" class="chip ghost">Clear</button>
+        </div>
+      </div>
+      <div id="backlogGrid" class="grid" aria-live="polite"></div>
+    </section>
+
+    <!-- CALENDAR VIEW -->
+    <section id="view-calendar" class="view" aria-label="Calendar" hidden>
+      <div class="calendar-toolbar">
+        <div class="week-controls">
+          <button id="prevWeek" title="Previous week" aria-label="Previous week">◀</button>
+          <button id="thisWeek" title="This week" aria-label="This week">Today</button>
+          <button id="nextWeek" title="Next week" aria-label="Next week">▶</button>
+          <span id="weekLabel" class="week-label"></span>
+        </div>
+        <div class="calendar-search">
+          <input id="searchCalendarBacklog" type="search" placeholder="Filter backlog…" aria-label="Filter backlog for calendar" />
+          <button id="toggleSidebar" class="ghost">Toggle backlog</button>
+        </div>
+      </div>
+      <div class="calendar-layout">
+        <aside id="calendarSidebar" class="sidebar" aria-label="Backlog items for drag & drop">
+          <h2>Backlog</h2>
+          <div class="chip-group small">
+            <button class="chip" data-filter="type:main">Main</button>
+            <button class="chip" data-filter="type:side">Side</button>
+            <button class="chip" data-filter="type:one">One-meal</button>
+            <button class="chip" data-filter="tag:breakfast">Breakfast</button>
+            <button class="chip" data-filter="tag:lunch">Lunch</button>
+            <button class="chip" data-filter="tag:dinner">Dinner</button>
+            <button class="chip" data-filter="tag:dessert">Dessert</button>
+            <button class="chip" data-filter="flag:thermomix">Thermomix</button>
+            <button class="chip" data-filter="flag:want">Want</button>
+            <button id="clearFiltersCalendar" class="chip ghost">Clear</button>
+          </div>
+          <div id="calendarBacklogList" class="list" aria-live="polite"></div>
+        </aside>
+
+        <section class="calendar" aria-label="Weekly meal planner">
+          <div id="calendarGrid" class="calendar-grid" role="grid" aria-readonly="true"></div>
+          <p class="hint">Drag a backlog card into any meal slot. Drag within a cell to reorder. Click a placed card to remove or open details.</p>
+        </section>
+      </div>
+    </section>
+
+    <!-- FILTERS VIEW -->
+    <section id="view-filters" class="view" aria-label="Filters" hidden>
+      <div class="filters-layout">
+        <aside class="filters-pane">
+          <h2>Build a filter</h2>
+          <div class="form">
+            <label class="group-label">Type</label>
+            <div class="row">
+              <label><input type="checkbox" class="flt-type" value="main" /> Main</label>
+              <label><input type="checkbox" class="flt-type" value="side" /> Side</label>
+              <label><input type="checkbox" class="flt-type" value="one" /> One-meal</label>
+            </div>
+
+            <label class="group-label">Meal</label>
+            <div class="row">
+              <label><input type="checkbox" class="flt-tag" value="breakfast" /> Breakfast</label>
+              <label><input type="checkbox" class="flt-tag" value="lunch" /> Lunch</label>
+              <label><input type="checkbox" class="flt-tag" value="dinner" /> Dinner</label>
+              <label><input type="checkbox" class="flt-tag" value="dessert" /> Dessert</label>
+            </div>
+
+            <label class="group-label">Flags</label>
+            <div class="row">
+              <label><input type="checkbox" class="flt-flag" value="thermomix" /> Thermomix</label>
+              <label><input type="checkbox" class="flt-flag" value="cooked" /> Cooked before</label>
+              <label><input type="checkbox" class="flt-flag" value="want" /> Want to cook</label>
+            </div>
+
+            <label for="fltText" class="group-label">Text contains</label>
+            <input id="fltText" type="search" placeholder="Name / ingredients / tags…" />
+            <label for="fltTags" class="group-label">Tags (comma separated)</label>
+            <input id="fltTags" type="text" placeholder="e.g. italian, kid-friendly" />
+
+            <button id="runFilter" class="primary">Run filter</button>
+            <button id="clearFilter" class="ghost">Clear</button>
+          </div>
+        </aside>
+
+        <section class="filters-results">
+          <h2>Results</h2>
+          <div id="filtersResults" class="grid"></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <!-- ADD/EDIT MODAL -->
+  <dialog id="foodDialog" aria-labelledby="foodDialogTitle">
+    <form method="dialog" id="foodForm">
+      <header class="dialog-header">
+        <h2 id="foodDialogTitle">Add food</h2>
+        <button type="button" class="icon" id="closeDialog" aria-label="Close">✕</button>
+      </header>
+
+      <div class="form two-col">
+        <label for="foodName">Name</label>
+        <input id="foodName" name="name" type="text" required />
+
+        <label>Type</label>
+        <div class="row">
+          <label class="swatch main"><input type="radio" name="type" value="main" required /> Main</label>
+          <label class="swatch side"><input type="radio" name="type" value="side" /> Side</label>
+          <label class="swatch one"><input type="radio" name="type" value="one" /> One-meal</label>
+        </div>
+
+        <label>Meal tags</label>
+        <div class="row">
+          <label><input type="checkbox" name="tag-breakfast" /> Breakfast</label>
+          <label><input type="checkbox" name="tag-lunch" /> Lunch</label>
+          <label><input type="checkbox" name="tag-dinner" /> Dinner</label>
+          <label><input type="checkbox" name="tag-dessert" /> Dessert</label>
+        </div>
+
+        <label>Flags</label>
+        <div class="row">
+          <label><input type="checkbox" name="thermomix" /> Thermomix</label>
+          <label><input type="checkbox" name="cooked" /> Cooked before</label>
+          <label><input type="checkbox" name="want" /> Want to cook</label>
+        </div>
+
+        <label for="labelsInput">Freeform tags</label>
+        <div class="tag-editor">
+          <div id="labelsChips" class="chips-line" aria-live="polite"></div>
+          <input id="labelsInput" type="text" placeholder="Type a tag and press Enter" />
+        </div>
+
+        <label for="ingredients">Ingredients (one per line)</label>
+        <textarea id="ingredients" name="ingredients" rows="5" placeholder="- 2 eggs
+- 1 cup flour"></textarea>
+
+        <label for="recipeUrl">Recipe link</label>
+        <input id="recipeUrl" name="recipeUrl" type="url" placeholder="https://example.com/recipe" />
+
+        <label for="screenshot">Screenshot</label>
+        <input id="screenshot" name="screenshot" type="file" accept="image/*" />
+        <div id="screenshotPreview" class="screenshot-preview" aria-live="polite"></div>
+      </div>
+
+      <footer class="dialog-footer">
+        <button type="submit" value="save" class="primary">Save</button>
+        <button type="submit" value="delete" class="danger" id="deleteFoodBtn" hidden>Delete</button>
+        <button type="button" class="ghost" id="exportBtn" title="Download all your recipes and calendar as a JSON backup">Export JSON</button>
+        <button type="button" class="ghost" id="importBtn" title="Load recipes/calendar from a JSON backup">Import JSON</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <template id="cardTemplate">
+    <article class="card" tabindex="0">
+      <div class="color"></div>
+      <h3 class="title"></h3>
+      <div class="chips"></div>
+      <div class="icons"></div>
+    </article>
+  </template>
+
+  <template id="miniCardTemplate">
+    <div class="mini-card" draggable="true">
+      <span class="dot"></span>
+      <span class="label"></span>
+      <button class="icon remove" title="Remove from slot" aria-label="Remove">✕</button>
+    </div>
+  </template>
+
+  <script>
+/* Recipe Backlog App — Vanilla JS (v4) */
+
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
+
+const STORAGE_ITEMS = 'rb_items';
+const STORAGE_SCHEDULE = 'rb_schedule';
+const THEME_KEY = 'rb_theme';
+
+// --------- Utilities ----------
+const uuid = () => (crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Math.random().toString(36).slice(2);
+const today = new Date();
+const startOfWeek = (d) => {
+  const nd = new Date(d);
+  const day = (nd.getDay() + 6) % 7; // Monday=0
+  nd.setDate(nd.getDate() - day);
+  nd.setHours(0,0,0,0);
+  return nd;
+};
+const fmtDate = (d) => d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
+const typeColor = (type) => ({
+  'main': 'var(--type-main)',
+  'side': 'var(--type-side)',
+  'one': 'var(--type-one)'
+}[type] || 'var(--primary)');
+
+function loadItems() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_ITEMS) || '[]'); } catch { return []; }
+}
+function saveItems(items) {
+  localStorage.setItem(STORAGE_ITEMS, JSON.stringify(items));
+}
+function loadSchedule() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_SCHEDULE) || '{}'); } catch { return {}; }
+}
+function saveSchedule(s) {
+  localStorage.setItem(STORAGE_SCHEDULE, JSON.stringify(s));
+}
+
+// --------- Theme ----------
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem(THEME_KEY, theme);
+  const btn = $('#themeToggle'); if (!btn) return;
+  btn.textContent = (theme === 'dark') ? '🌙' : '☀️';
+  btn.title = (theme === 'dark') ? 'Switch to light' : 'Switch to dark';
+}
+(function initTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved || (prefersDark ? 'dark' : 'light'));
+})();
+$('#themeToggle').addEventListener('click', () => {
+  const next = (document.documentElement.getAttribute('data-theme') === 'dark') ? 'light' : 'dark';
+  applyTheme(next);
+});
+
+// --------- Tab Navigation ----------
+const tabs = $$('.tab');
+const views = $$('.view');
+function activateTab(tabName) {
+  tabs.forEach(b=>b.classList.toggle('active', b.dataset.tab === tabName));
+  views.forEach(v=>{
+    const active = v.id === `view-${tabName}`;
+    v.toggleAttribute('hidden', !active);
+    v.classList.toggle('active', active);
+  });
+  if (tabName === 'calendar') renderCalendar();
+  if (tabName === 'backlog') renderBacklog();
+  updateToggleViewBtn();
+}
+tabs.forEach(btn => {
+  btn.addEventListener('click', () => activateTab(btn.dataset.tab));
+});
+
+// Quick switch button Backlog <-> Calendar
+const toggleViewBtn = $('#toggleViewBtn');
+function updateToggleViewBtn() {
+  const active = $('.tab.active')?.dataset.tab || 'backlog';
+  toggleViewBtn.textContent = (active === 'backlog') ? 'Go to Calendar' : 'Go to Backlog';
+}
+toggleViewBtn.addEventListener('click', () => {
+  const active = $('.tab.active')?.dataset.tab || 'backlog';
+  activateTab(active === 'backlog' ? 'calendar' : 'backlog');
+});
+// Keyboard shortcuts: 1=Backlog, 2=Calendar, 3=Filters; b/c too
+document.addEventListener('keydown', (e) => {
+  if (/^(input|textarea)$/i.test(e.target.tagName)) return;
+  if (e.key === '1' || e.key.toLowerCase() === 'b') activateTab('backlog');
+  if (e.key === '2' || e.key.toLowerCase() === 'c') activateTab('calendar');
+  if (e.key === '3') activateTab('filters');
+});
+
+// --------- Add/Edit Dialog ----------
+const foodDialog = $('#foodDialog');
+const foodForm = $('#foodForm');
+const deleteFoodBtn = $('#deleteFoodBtn');
+let editingId = null;
+
+$('#addFoodBtn').addEventListener('click', () => openDialog());
+$('#closeDialog').addEventListener('click', () => foodDialog.close());
+
+$('#screenshot').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) { $('#screenshotPreview').innerHTML = ''; return; }
+  const dataUrl = await fileToDataUrl(file);
+  $('#screenshotPreview').innerHTML = `<img src="${dataUrl}" alt="Screenshot preview" />`;
+  foodForm.dataset.screenshot = dataUrl;
+});
+function fileToDataUrl(file) {
+  return new Promise((resolve,reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+// --- Tag editor logic ---
+function renderLabelChips(labels) {
+  const box = $('#labelsChips'); box.innerHTML='';
+  (labels||[]).forEach(t => box.append(makeTagChip(t)));
+}
+function makeTagChip(text) {
+  const span = document.createElement('span');
+  span.className = 'tag-chip';
+  span.dataset.tag = text;
+  span.innerHTML = `<span>#${text}<\/span><button title="Remove tag" aria-label="Remove tag">✕<\/button>`;
+  $('button', span).addEventListener('click', () => span.remove());
+  return span;
+}
+function collectLabels() {
+  return $$('#labelsChips .tag-chip').map(el => el.dataset.tag);
+}
+$('#labelsInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab') {
+    e.preventDefault();
+    const t = e.currentTarget.value.trim().replace(/,$/, '');
+    if (!t) return;
+    const exists = $$('#labelsChips .tag-chip').some(el => el.dataset.tag.toLowerCase() === t.toLowerCase());
+    if (!exists) $('#labelsChips').append(makeTagChip(t));
+    e.currentTarget.value = '';
+  }
+});
+
+function openDialog(item=null) {
+  foodForm.reset();
+  $('#screenshotPreview').innerHTML = '';
+  delete foodForm.dataset.screenshot;
+  editingId = null;
+  $('#foodDialogTitle').textContent = item ? 'Edit food' : 'Add food';
+  deleteFoodBtn.hidden = !item;
+  if (item) {
+    editingId = item.id;
+    $('#foodName').value = item.name || '';
+    $$('input[name="type"]').forEach(r => r.checked = (r.value === item.type));
+    $('input[name="tag-breakfast"]').checked = !!item.tags?.breakfast;
+    $('input[name="tag-lunch"]').checked = !!item.tags?.lunch;
+    $('input[name="tag-dinner"]').checked = !!item.tags?.dinner;
+    $('input[name="tag-dessert"]').checked = !!item.tags?.dessert;
+    $('input[name="thermomix"]').checked = !!item.flags?.thermomix;
+    $('input[name="cooked"]').checked = !!item.flags?.cooked;
+    $('input[name="want"]').checked = !!item.flags?.want;
+    renderLabelChips(item.labels || []);
+    $('#ingredients').value = (item.ingredients || []).join('\n');
+    $('#recipeUrl').value = item.recipeUrl || '';
+    if (item.imageDataUrl) {
+      $('#screenshotPreview').innerHTML = `<img src="${item.imageDataUrl}" alt="Screenshot preview" />`;
+      foodForm.dataset.screenshot = item.imageDataUrl;
+    }
+  } else {
+    renderLabelChips([]);
+  }
+  foodDialog.showModal();
+}
+
+foodForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const submitter = e.submitter?.value || 'save';
+  if (submitter === 'delete' && editingId) {
+    const items = loadItems().filter(i => i.id !== editingId);
+    saveItems(items);
+    foodDialog.close();
+    renderAll();
+    return;
+  }
+
+  const name = $('#foodName').value.trim();
+  if (!name) return alert('Please enter a name.');
+  const type = ($$('input[name="type"]').find(r=>r.checked) || {}).value || 'main';
+  const tags = {
+    breakfast: $('input[name="tag-breakfast"]').checked,
+    lunch: $('input[name="tag-lunch"]').checked,
+    dinner: $('input[name="tag-dinner"]').checked,
+    dessert: $('input[name="tag-dessert"]').checked,
+  };
+  const flags = {
+    thermomix: $('input[name="thermomix"]').checked,
+    cooked: $('input[name="cooked"]').checked,
+    want: $('input[name="want"]').checked,
+  };
+  const labels = collectLabels();
+  const ingredients = $('#ingredients').value.split(/\n+/).map(s=>s.replace(/^[-*]\s*/,'').trim()).filter(Boolean);
+  const recipeUrl = $('#recipeUrl').value.trim();
+  const imageDataUrl = foodForm.dataset.screenshot || '';
+
+  const items = loadItems();
+  if (editingId) {
+    const idx = items.findIndex(i=>i.id===editingId);
+    if (idx >= 0) items[idx] = {...items[idx], name, type, tags, flags, labels, ingredients, recipeUrl, imageDataUrl, updatedAt: Date.now()};
+  } else {
+    items.unshift({ id: uuid(), name, type, tags, flags, labels, ingredients, recipeUrl, imageDataUrl, createdAt: Date.now(), updatedAt: Date.now() });
+  }
+  saveItems(items);
+  foodDialog.close();
+  renderAll();
+});
+
+// Export/Import JSON inside dialog (quick backup)
+$('#exportBtn').addEventListener('click', () => {
+  const data = { items: loadItems(), schedule: loadSchedule() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'recipe-backlog.json'; a.click();
+  URL.revokeObjectURL(url);
+});
+$('#importBtn').addEventListener('click', async () => {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = 'application/json';
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    const txt = await file.text();
+    try {
+      const data = JSON.parse(txt);
+      if (Array.isArray(data.items)) saveItems(data.items);
+      if (data.schedule && typeof data.schedule === 'object') saveSchedule(data.schedule);
+      alert('Imported!');
+      renderAll();
+    } catch (e) {
+      alert('Invalid JSON.');
+    }
+  };
+  input.click();
+});
+
+// --------- Backlog rendering ----------
+let backlogFilters = new Set();
+$('#clearFiltersBacklog').addEventListener('click', () => { backlogFilters.clear(); syncChips(); renderBacklog(); });
+$('#searchBacklog').addEventListener('input', renderBacklog);
+$$('#view-backlog .chip[data-filter]').forEach(ch => ch.addEventListener('click', () => {
+  toggleFilter(ch.dataset.filter);
+  renderBacklog();
+}));
+
+function toggleFilter(f) { backlogFilters.has(f) ? backlogFilters.delete(f) : backlogFilters.add(f); syncChips(); }
+function syncChips() {
+  $$('[data-filter]').forEach(ch => ch.classList.toggle('active', backlogFilters.has(ch.dataset.filter)));
+  $$('[id^="clearFilters"]').forEach(btn => btn.classList.toggle('active', false));
+}
+
+function cardFromItem(item) {
+  const tpl = $('#cardTemplate').content.firstElementChild.cloneNode(true);
+  tpl.dataset.id = item.id;
+  $('.color', tpl).style.background = typeColor(item.type);
+  $('.title', tpl).textContent = item.name;
+
+  const chips = $('.chips', tpl);
+  if (item.tags?.breakfast) chips.append(badge('Breakfast'));
+  if (item.tags?.lunch) chips.append(badge('Lunch'));
+  if (item.tags?.dinner) chips.append(badge('Dinner'));
+  if (item.tags?.dessert) chips.append(badge('Dessert'));
+  // Freeform tags (up to 3)
+  const labels = (item.labels || []).slice(0,3);
+  for (const t of labels) chips.append(tagChipForCard(t));
+
+  const icons = $('.icons', tpl);
+  if (item.flags?.thermomix) icons.append(icon('🌀','Thermomix'));
+  if (item.flags?.cooked) icons.append(icon('✅','Cooked'));
+  if (item.flags?.want) icons.append(icon('⭐','Want'));
+  tpl.addEventListener('click', () => openDialog(item));
+  tpl.addEventListener('keydown', (e) => { if (e.key === 'Enter') openDialog(item); });
+  return tpl;
+}
+function tagChipForCard(text){ const c=document.createElement('span'); c.className='tag-chip'; c.textContent = '#'+text; return c; }
+function badge(text) {
+  const el = document.createElement('span');
+  el.className = 'badge'; el.textContent = text; return el;
+}
+function icon(char,label) {
+  const el = document.createElement('span');
+  el.setAttribute('role','img'); el.setAttribute('aria-label', label); el.textContent = char; return el;
+}
+
+function applyFilters(items, filters, text='') {
+  let out = items;
+  for (const f of filters) {
+    const [kind, val] = f.split(':');
+    if (kind === 'type') out = out.filter(i => i.type === val);
+    if (kind === 'tag') out = out.filter(i => !!i.tags?.[val]);
+    if (kind === 'flag') out = out.filter(i => !!i.flags?.[val]);
+  }
+  if (text) {
+    const q = text.toLowerCase();
+    out = out.filter(i =>
+      i.name.toLowerCase().includes(q) ||
+      (i.ingredients||[]).join(' ').toLowerCase().includes(q) ||
+      (i.labels||[]).join(' ').toLowerCase().includes(q)
+    );
+  }
+  return out;
+}
+
+function renderBacklog() {
+  const grid = $('#backlogGrid'); grid.innerHTML = '';
+  const items = loadItems();
+  const text = $('#searchBacklog').value.trim();
+  const list = applyFilters(items, backlogFilters, text);
+  if (!list.length) grid.innerHTML = `<p style="color:var(--muted)">No items match.<\/p>`;
+  list.forEach(item => grid.append(cardFromItem(item)));
+}
+
+// --------- Calendar View ----------
+let calendarFilters = new Set();
+$('#clearFiltersCalendar').addEventListener('click', () => { calendarFilters.clear(); syncCalendarChips(); renderCalendarSidebar(); });
+$('#searchCalendarBacklog').addEventListener('input', renderCalendarSidebar);
+$$('#calendarSidebar .chip[data-filter]').forEach(ch => ch.addEventListener('click', () => { toggleCalendarFilter(ch.dataset.filter); renderCalendarSidebar(); }));
+$('#toggleSidebar').addEventListener('click', () => $('#calendarSidebar').classList.toggle('hidden'));
+
+function toggleCalendarFilter(f) { calendarFilters.has(f) ? calendarFilters.delete(f) : calendarFilters.add(f); syncCalendarChips(); }
+function syncCalendarChips() { $$('#calendarSidebar .chip[data-filter]').forEach(ch => ch.classList.toggle('active', calendarFilters.has(ch.dataset.filter))); }
+
+let currentWeekStart = startOfWeek(today);
+$('#prevWeek').addEventListener('click', () => { currentWeekStart = new Date(currentWeekStart); currentWeekStart.setDate(currentWeekStart.getDate()-7); renderCalendar(); });
+$('#nextWeek').addEventListener('click', () => { currentWeekStart = new Date(currentWeekStart); currentWeekStart.setDate(currentWeekStart.getDate()+7); renderCalendar(); });
+$('#thisWeek').addEventListener('click', () => { currentWeekStart = startOfWeek(new Date()); renderCalendar(); });
+
+function renderCalendar() {
+  $('#weekLabel').textContent = `${fmtDate(currentWeekStart)} → ${fmtDate(new Date(currentWeekStart.getFullYear(), currentWeekStart.getMonth(), currentWeekStart.getDate()+6))}`;
+  renderCalendarSidebar();
+  renderCalendarGrid();
+}
+
+function renderCalendarSidebar() {
+  const listEl = $('#calendarBacklogList'); listEl.innerHTML = '';
+  const items = applyFilters(loadItems(), calendarFilters, $('#searchCalendarBacklog').value.trim());
+  if (!items.length) listEl.innerHTML = `<p style="color:var(--muted)">Nothing to show.<\/p>`;
+  for (const it of items) {
+    const node = $('#miniCardTemplate').content.firstElementChild.cloneNode(true);
+    node.dataset.id = it.id;
+    $('.dot', node).style.background = typeColor(it.type);
+    $('.label', node).textContent = it.name;
+    node.addEventListener('dragstart', (e) => {
+      e.dataTransfer.setData('text/plain', JSON.stringify({kind:'backlog', id: it.id}));
+      e.dataTransfer.effectAllowed = 'copyMove';
+    });
+    listEl.append(node);
+  }
+}
+
+function renderCalendarGrid() {
+  const grid = $('#calendarGrid'); grid.innerHTML = '';
+  const schedule = loadSchedule();
+  const weekKey = currentWeekStart.toISOString().slice(0,10);
+  const week = schedule[weekKey] || {};
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  for (let d=0; d<7; d++) {
+    const date = new Date(currentWeekStart); date.setDate(date.getDate()+d);
+    const col = document.createElement('div');
+    col.className = 'day-col';
+    const head = document.createElement('div');
+    head.className = 'day-header';
+    head.innerHTML = `<span>${dayNames[d]}<\/span><span>${fmtDate(date)}<\/span>`;
+    col.append(head);
+    for (const slot of ['breakfast','lunch','dinner']) {
+      const slotEl = document.createElement('div');
+      slotEl.className = 'slot';
+      slotEl.dataset.slot = slot;
+      slotEl.dataset.day = d;
+      slotEl.dataset.week = weekKey;
+      slotEl.setAttribute('role','gridcell');
+      slotEl.setAttribute('aria-label', `${dayNames[d]} ${slot}`);
+
+      enableDrop(slotEl);
+      const items = (((week[d]||{})[slot])||[]).map(id => loadItems().find(i=>i.id===id)).filter(Boolean);
+      for (const it of items) slotEl.append(miniCardInCalendar(it, slotEl));
+
+      const lab = document.createElement('div');
+      lab.style.color = 'var(--muted)'; lab.style.fontSize = '12px';
+      lab.textContent = slot[0].toUpperCase()+slot.slice(1);
+      slotEl.prepend(lab);
+
+      col.append(slotEl);
+    }
+    grid.append(col);
+  }
+}
+
+function enableDrop(slotEl) {
+  slotEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect='copy';
+    slotEl.classList.add('over');
+  });
+  slotEl.addEventListener('dragleave', () => slotEl.classList.remove('over'));
+  slotEl.addEventListener('drop', (e) => {
+    e.preventDefault(); slotEl.classList.remove('over');
+    let data;
+    try { data = JSON.parse(e.dataTransfer.getData('text/plain')); } catch {}
+    if (!data) return;
+
+    const schedule = loadSchedule();
+    const weekKey = slotEl.dataset.week;
+    schedule[weekKey] = schedule[weekKey] || {};
+    schedule[weekKey][slotEl.dataset.day] = schedule[weekKey][slotEl.dataset.day] || {breakfast:[],lunch:[],dinner:[]};
+
+    // Compute insertion index relative to existing mini-cards
+    const insertIndex = getInsertIndex(slotEl, e.clientY);
+    const targetArr = schedule[weekKey][slotEl.dataset.day][slotEl.dataset.slot];
+
+    if (data.kind === 'backlog') {
+      targetArr.splice(insertIndex, 0, data.id);
+    } else if (data.kind === 'calendar') {
+      const fromArr = (schedule[data.week][data.day][data.slot])||[];
+      const fromIdx = fromArr.indexOf(data.id);
+      if (fromIdx >= 0) fromArr.splice(fromIdx,1);
+      let adjustedIndex = insertIndex;
+      if (data.week===weekKey && data.day===slotEl.dataset.day && data.slot===slotEl.dataset.slot && fromIdx >=0 && fromIdx < insertIndex) {
+        adjustedIndex = insertIndex - 1;
+      }
+      targetArr.splice(adjustedIndex, 0, data.id);
+    }
+
+    saveSchedule(schedule);
+    renderCalendarGrid();
+  });
+}
+function getInsertIndex(slotEl, clientY) {
+  const cards = Array.from(slotEl.querySelectorAll('.mini-card'));
+  for (let i=0; i<cards.length; i++) {
+    const rect = cards[i].getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    if (clientY < mid) return i;
+  }
+  return cards.length;
+}
+
+function miniCardInCalendar(item, hostSlotEl) {
+  const node = $('#miniCardTemplate').content.firstElementChild.cloneNode(true);
+  node.dataset.id = item.id;
+  $('.dot', node).style.background = typeColor(item.type);
+  $('.label', node).textContent = item.name;
+  node.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', JSON.stringify({kind:'calendar', id: item.id, week: hostSlotEl.dataset.week, day: hostSlotEl.dataset.day, slot: hostSlotEl.dataset.slot}));
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  $('.remove', node).addEventListener('click', () => {
+    const schedule = loadSchedule();
+    const weekKey = hostSlotEl.dataset.week;
+    const arr = (((schedule[weekKey]||{})[hostSlotEl.dataset.day]||{})[hostSlotEl.dataset.slot])||[];
+    const idx = arr.indexOf(item.id); if (idx>=0) arr.splice(idx,1);
+    saveSchedule(schedule); renderCalendarGrid();
+  });
+  node.addEventListener('click', (e) => { if (e.target.closest('.remove')) return; openDialog(item); });
+  return node;
+}
+
+// --------- Filters View ----------
+$('#runFilter').addEventListener('click', runAdvancedFilter);
+$('#clearFilter').addEventListener('click', () => {
+  $$('.flt-type, .flt-tag, .flt-flag').forEach(cb => cb.checked = false);
+  $('#fltText').value='';
+  const ft = $('#fltTags'); if (ft) ft.value='';
+  runAdvancedFilter();
+});
+
+function runAdvancedFilter() {
+  const types = $$('.flt-type:checked').map(cb=>cb.value);
+  const tags = $$('.flt-tag:checked').map(cb=>cb.value);
+  const flags = $$('.flt-flag:checked').map(cb=>cb.value);
+  const text = $('#fltText').value.trim().toLowerCase();
+  const tagText = ($('#fltTags')?.value || '').trim().toLowerCase();
+  const tagTokens = tagText ? tagText.split(',').map(s=>s.trim()).filter(Boolean) : [];
+  let items = loadItems();
+  if (types.length) items = items.filter(i => types.includes(i.type));
+  for (const t of tags) items = items.filter(i => i.tags?.[t]);
+  for (const f of flags) items = items.filter(i => i.flags?.[f]);
+  if (tagTokens.length) items = items.filter(i => tagTokens.every(t => (i.labels||[]).map(x=>x.toLowerCase()).includes(t)));
+  if (text) items = items.filter(i =>
+    i.name.toLowerCase().includes(text) ||
+    (i.ingredients||[]).join(' ').toLowerCase().includes(text) ||
+    (i.labels||[]).join(' ').toLowerCase().includes(text)
+  );
+  const grid = $('#filtersResults'); grid.innerHTML = '';
+  if (!items.length) grid.innerHTML = `<p style="color:var(--muted)">No results.<\/p>`;
+  items.forEach(it => grid.append(cardFromItem(it)));
+}
+
+// --------- Seed data (only if empty) ----------
+(function seed() {
+  const items = loadItems();
+  if (items.length) return;
+  const sample = [
+    {name:'Shakshuka', type:'one', tags:{breakfast:true, lunch:true, dinner:false, dessert:false}, flags:{thermomix:false,cooked:true,want:false}, labels:['eggs','vegetarian'], ingredients:['eggs','tomatoes','onion','paprika'], recipeUrl:'', imageDataUrl:''},
+    {name:'Chicken Caesar Salad', type:'main', tags:{breakfast:false, lunch:true, dinner:true, dessert:false}, flags:{thermomix:false,cooked:false,want:true}, labels:['salad','quick'], ingredients:['chicken','romaine','parmesan','croutons'], recipeUrl:'', imageDataUrl:''},
+    {name:'Miso Glazed Salmon', type:'main', tags:{breakfast:false,lunch:false,dinner:true, dessert:false}, flags:{thermomix:false,cooked:false,want:true}, labels:['seafood'], ingredients:['salmon','miso','mirin'], recipeUrl:'', imageDataUrl:''},
+    {name:'Roasted Veggies', type:'side', tags:{breakfast:false,lunch:true,dinner:true, dessert:false}, flags:{thermomix:false,cooked:true,want:false}, labels:['vegan','roast'], ingredients:['carrot','zucchini','broccoli'], recipeUrl:'', imageDataUrl:''},
+    {name:'Chocolate Mousse', type:'one', tags:{breakfast:false,lunch:false,dinner:false, dessert:true}, flags:{thermomix:false,cooked:false,want:true}, labels:['dessert','chocolate'], ingredients:['chocolate','cream','eggs'], recipeUrl:'', imageDataUrl:''},
+  ].map(x => ({...x, id: uuid(), createdAt: Date.now(), updatedAt: Date.now()}));
+  saveItems(sample);
+})();
+
+// --------- Initial render ----------
+function renderAll() { renderBacklog(); if ($('#view-calendar').classList.contains('active')) renderCalendar(); runAdvancedFilter(); }
+document.addEventListener('DOMContentLoaded', () => { renderBacklog(); runAdvancedFilter(); updateToggleViewBtn(); });
+
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Recipe Backlog v3</title>
+  <title>Recipe Backlog v4</title>
   <style>
 /* ============ CSS RESET & VARIABLES ============ */
 *,
@@ -229,10 +229,9 @@ dialog::backdrop { background: rgba(5,8,12,.6); backdrop-filter: blur(2px); }
 .hidden { display: none !important; }
 
 
-/* ===== Added: Mobile-friendly calendar + DnD ===== */
+/* ===== Mobile upgrades (v4): touch DnD, bottom drawer tabs, Fit‑Week toggle, lower Add FAB ===== */
 @media (pointer: coarse) {
-  .mini-card { touch-action: none; }
-  .mini-card .remove { display: inline-block; } /* no hover on touch */
+  .mini-card { touch-action: none; } /* prevent scroll during drag */
 }
 .drag-ghost {
   position: fixed;
@@ -243,8 +242,12 @@ dialog::backdrop { background: rgba(5,8,12,.6); backdrop-filter: blur(2px); }
   box-shadow: 0 10px 28px rgba(0,0,0,.35);
   border-radius: 10px;
 }
+/* iOS smooth scroll + safe viewport height use */
+.sidebar { -webkit-overflow-scrolling: touch; height: calc(100dvh - 220px); }
+
+/* --- Bottom drawer on phones: shows Backlog/Filter tabs over the calendar --- */
 @media (max-width: 980px) {
-  /* Turn the sidebar into a bottom drawer on phones */
+  /* Use the existing #calendarSidebar as a bottom drawer */
   #calendarSidebar {
     position: fixed; left: 0; right: 0; bottom: 0; top: auto;
     height: min(60dvh, 520px);
@@ -254,32 +257,56 @@ dialog::backdrop { background: rgba(5,8,12,.6); backdrop-filter: blur(2px); }
     box-shadow: 0 -8px 24px rgba(0,0,0,.35);
     z-index: 1000;
     padding-top: 8px;
+    background: var(--surface);
   }
   #calendarSidebar.open { transform: translateY(0); }
   #calendarSidebar .drawer-handle {
     width: 44px; height: 5px; border-radius: 999px;
     background: var(--chip-border); margin: 6px auto 8px;
   }
-  /* Hide non-mobile controls; we'll use a FAB */
-  #toggleSidebar { display: none; }
-  /* Horizontally scrollable week columns with comfy width */
+  /* Drawer tabs (Backlog / Filter) */
+  #calendarSidebar .drawer-tabs { display: flex; gap: 8px; justify-content: center; margin: 2px 0 8px; }
+  #calendarSidebar .drawer-tab {
+    padding: 6px 10px; border-radius: 999px; border: 1px solid var(--chip-border);
+    background: var(--chip-bg); color: var(--text); cursor: pointer;
+  }
+  #calendarSidebar .drawer-tab.active { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+  #calendarSidebar .drawer-panel { display: none; }
+  #calendarSidebar .drawer-panel.active { display: block; }
+  /* Drawer should not block taps when closed */
+  #calendarSidebar { pointer-events: none; }
+  #calendarSidebar.open { pointer-events: auto; }
+
+  /* Hide header Add button on phones; provide FABs instead */
+  #addFoodBtn { display: none; }
+  /* FABs */
+  .fab {
+    position: fixed; bottom: 16px; z-index: 1050;
+    border: 0; border-radius: 999px; padding: 12px 14px; font-weight: 600;
+    color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.35);
+  }
+  #openDrawerFab { right: 16px; background: var(--primary); }
+  #addFoodFab { left: 16px; background: var(--good); }
+
+  /* Calendar width on phones: default is comfy, horizontal scroll */
   .calendar { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .calendar-grid { grid-template-columns: repeat(7, minmax(260px, 1fr)); width: max-content; }
   .day-col { min-width: 260px; }
   .slot { min-height: 120px; }
-  /* Floating "Backlog" button on phones */
-  .fab {
-    position: fixed; right: 16px; bottom: 16px; z-index: 1050;
-    border: 0; border-radius: 999px; padding: 12px 14px; font-weight: 600;
-    background: var(--primary); color: #fff; box-shadow: 0 6px 16px rgba(0,0,0,.35);
-  }
+
+  /* Compact "Fit week" mode to see all 7 days at once */
+  .calendar.compact { overflow-x: hidden; }
+  .calendar.compact .calendar-grid { grid-template-columns: repeat(7, 1fr); width: 100%; }
+  .calendar.compact .day-col { min-width: auto; }
+  .calendar.compact .slot { min-height: 72px; }
+  .calendar.compact .day-header { font-size: 12px; }
+  /* Hide desktop toggle button in calendar toolbar on mobile */
+  #toggleSidebar { display: none; }
 }
-/* Picker dialog tweaks */
-.picker-list .pick {
-  display: grid; grid-template-columns: 16px 1fr auto; align-items: center; gap: 8px;
-  border: 1px solid var(--chip-border); background: var(--elev-2); border-radius: 10px; padding: 6px 8px;
-}
-.picker-list .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+/* Drawer filter form micro styles */
+.drawer-form .row { display: flex; gap: 10px; flex-wrap: wrap; }
+.drawer-form label { font-size: 12px; color: var(--muted); }
+.drawer-form h3 { font-size: 13px; margin: 8px 0 2px; color: var(--muted); }
 
 </style>
 </head>
@@ -1005,7 +1032,8 @@ function renderAll() { renderBacklog(); if ($('#view-calendar').classList.contai
 document.addEventListener('DOMContentLoaded', () => { renderBacklog(); runAdvancedFilter(); updateToggleViewBtn(); });
 
 
-// ===== Added: Mobile-friendly DnD + Bottom Drawer + Tap-to-Add =====
+
+// ===== Mobile-friendly Drag & Drop + Drawer Tabs + Fit-Week + Add FAB (v4) =====
 
 // Shared drop helper so mobile + desktop behave identically
 function dropDataIntoSlot(data, slotEl, clientY) {
@@ -1014,7 +1042,6 @@ function dropDataIntoSlot(data, slotEl, clientY) {
   schedule[weekKey] = schedule[weekKey] || {};
   schedule[weekKey][slotEl.dataset.day] = schedule[weekKey][slotEl.dataset.day] || {breakfast:[],lunch:[],dinner:[]};
 
-  // Compute insertion index using existing helper
   const insertIndex = getInsertIndex(slotEl, clientY);
   const targetArr = schedule[weekKey][slotEl.dataset.day][slotEl.dataset.slot];
 
@@ -1040,7 +1067,7 @@ function getSlotFromPoint(x, y) {
 }
 
 // --- Mobile DnD via Pointer Events ---
-function enableMobileDnD() {
+(function enableMobileDnD() {
   const coarse = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || ('ontouchstart' in window);
   if (!coarse) return;
 
@@ -1051,10 +1078,11 @@ function enableMobileDnD() {
   let originData = null;
   let pressTimer = null;
   let srcNode = null;
-
-  let vDir = 0, hDir = 0;
   let scrollTimer = null;
+  let vDir = 0, hDir = 0;
   const calendarEl = document.querySelector('.calendar');
+
+  function updateGhost(x, y) { if (ghost) ghost.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`; }
 
   function setAutoScrollDirs(x, y) {
     const margin = 60;
@@ -1069,14 +1097,12 @@ function enableMobileDnD() {
         else if (x > rect.right - margin) hDir = 1;
       }
     }
-    if ((vDir || hDir) && !scrollTimer) {
+    if (!scrollTimer && (vDir || hDir)) {
       scrollTimer = setInterval(() => {
         if (vDir) window.scrollBy(0, 12 * vDir);
         if (calendarEl && hDir) calendarEl.scrollBy(12 * hDir, 0);
-        // stop interval automatically if directions become zero
-        if (!vDir && !hDir) { clearInterval(scrollTimer); scrollTimer = null; }
       }, 16);
-    } else if (!vDir && !hDir && scrollTimer) {
+    } else if (scrollTimer && !(vDir || hDir)) {
       clearInterval(scrollTimer); scrollTimer = null;
     }
   }
@@ -1104,66 +1130,62 @@ function enableMobileDnD() {
     document.addEventListener('pointerup', onPointerUp, { once: true });
   }
 
-  function updateGhost(x, y) {
-    if (!ghost) return;
-    ghost.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
-  }
-
   function onPointerDown(e){
     const node = e.target.closest('.mini-card');
     if (!node) return;
-    if (e.pointerType && e.pointerType !== 'touch') return; // avoid desktop
-    if (e.target.closest('.remove')) return; // allow tapping remove
+    if (e.pointerType && e.pointerType !== 'touch') return; // don't interfere with desktop
+    if (e.target.closest('.remove')) return; // allow tap remove
 
     originData = makeDataForNode(node);
     if (!originData) return;
     srcNode = node;
     startX = e.clientX; startY = e.clientY;
 
-    const moveHandler = (ev) => {
-      const dx = Math.abs(ev.clientX - startX), dy = Math.abs(ev.clientY - startY);
-      if (!dragging && (dx + dy > 6)) startDrag(ev);
-      if (!dragging) return;
-      ev.preventDefault(); // keep page from scrolling
-      updateGhost(ev.clientX, ev.clientY);
-      const slot = getSlotFromPoint(ev.clientX, ev.clientY);
-      if (currentSlot !== slot) {
-        if (currentSlot) currentSlot.classList.remove('over');
-        if (slot) slot.classList.add('over');
-        currentSlot = slot;
-      }
-      setAutoScrollDirs(ev.clientX, ev.clientY);
-    };
-
-    const upHandler = (ev) => {
-      clearTimeout(pressTimer);
-      setAutoScrollDirs(0,0); // stop auto scroll
-      document.removeEventListener('pointermove', moveHandler);
-      if (dragging) {
-        if (currentSlot) {
-          dropDataIntoSlot(originData, currentSlot, ev.clientY);
-          currentSlot.classList.remove('over');
-        }
-        if (ghost) ghost.remove();
-        if (srcNode) srcNode.style.opacity = '';
-      }
-      dragging = false; currentSlot = null; ghost = null; srcNode = null; originData = null;
-    };
-
+    document.addEventListener('pointermove', onPointerMove, {passive:false});
+    document.addEventListener('pointerup', onPointerUp, { once: true });
     pressTimer = setTimeout(() => startDrag(e), 140);
-    document.addEventListener('pointermove', moveHandler, {passive:false});
-    document.addEventListener('pointerup', upHandler, { once: true });
+  }
+
+  function onPointerMove(ev) {
+    const dx = Math.abs(ev.clientX - startX), dy = Math.abs(ev.clientY - startY);
+    if (!dragging && (dx + dy > 6)) startDrag(ev);
+    if (!dragging) return;
+    ev.preventDefault();
+    updateGhost(ev.clientX, ev.clientY);
+    const slot = getSlotFromPoint(ev.clientX, ev.clientY);
+    if (currentSlot !== slot) {
+      if (currentSlot) currentSlot.classList.remove('over');
+      if (slot) slot.classList.add('over');
+      currentSlot = slot;
+    }
+    setAutoScrollDirs(ev.clientX, ev.clientY);
+  }
+
+  function onPointerUp(ev) {
+    clearTimeout(pressTimer);
+    if (scrollTimer) { clearInterval(scrollTimer); scrollTimer = null; }
+    document.removeEventListener('pointermove', onPointerMove);
+    if (dragging) {
+      if (currentSlot) {
+        dropDataIntoSlot(originData, currentSlot, ev.clientY);
+        currentSlot.classList.remove('over');
+      }
+      if (ghost) ghost.remove();
+      if (srcNode) srcNode.style.opacity = '';
+    }
+    dragging = false; currentSlot = null; ghost = null; srcNode = null; originData = null;
   }
 
   document.addEventListener('pointerdown', onPointerDown, {passive:true});
-}
+})();
 
-// --- Mobile calendar UI: bottom drawer & FAB ---
-function installMobileCalendarUI() {
+// --- Mobile calendar UI: bottom drawer with Backlog/Filter tabs + FABs ---
+(function installCalendarMobileSuite(){
   const sidebar = document.getElementById('calendarSidebar');
   if (!sidebar) return;
   const mql = window.matchMedia('(max-width: 980px)');
-  let fab = null;
+  let backlogFab = null, addFab = null;
+  let tabsReady = false;
 
   function ensureHandle() {
     if (!sidebar.querySelector('.drawer-handle')) {
@@ -1173,103 +1195,268 @@ function installMobileCalendarUI() {
       h.addEventListener('click', ()=> sidebar.classList.toggle('open'));
     }
   }
-  function ensureFab() {
-    if (fab) return fab;
-    fab = document.createElement('button');
-    fab.type = 'button'; fab.id = 'openDrawerFab'; fab.className = 'fab'; fab.textContent = 'Backlog';
-    fab.addEventListener('click', ()=> sidebar.classList.toggle('open'));
-    document.body.appendChild(fab);
-    return fab;
+  function ensureFabs() {
+    if (!backlogFab) {
+      backlogFab = document.createElement('button');
+      backlogFab.id = 'openDrawerFab'; backlogFab.className = 'fab'; backlogFab.textContent = 'Backlog';
+      backlogFab.addEventListener('click', ()=> sidebar.classList.toggle('open'));
+      document.body.appendChild(backlogFab);
+    }
+    if (!addFab) {
+      addFab = document.createElement('button');
+      addFab.id = 'addFoodFab'; addFab.className = 'fab'; addFab.textContent = '＋ Add';
+      addFab.addEventListener('click', ()=> { try { openDialog(); } catch(e){} });
+      document.body.appendChild(addFab);
+    }
   }
-  function activeTabName() { return document.querySelector('.tab.active')?.dataset.tab; }
-  function refresh() {
-    const onCalendar = activeTabName() === 'calendar';
-    if (mql.matches && onCalendar) {
+
+  // Build drawer tabs and content
+  function ensureDrawerTabs() {
+    if (tabsReady) return;
+    tabsReady = true;
+    // Create tabs bar
+    const tabsBar = document.createElement('div');
+    tabsBar.className = 'drawer-tabs';
+    tabsBar.innerHTML = `<button class="drawer-tab active" data-panel="backlog">Backlog</button>
+                         <button class="drawer-tab" data-panel="filter">Filter</button>`;
+    // Panels
+    const backlogPanel = document.createElement('div');
+    backlogPanel.className = 'drawer-panel active';
+    backlogPanel.dataset.panel = 'backlog';
+    backlogPanel.innerHTML = `
+      <div class="toolbar" style="margin-top:4px">
+        <input id="drawerSearch" type="search" placeholder="Filter backlog…" aria-label="Filter backlog in drawer" />
+        <div class="chip-group small" id="drawerChips">
+          <button class="chip" data-filter="type:main">Main</button>
+          <button class="chip" data-filter="type:side">Side</button>
+          <button class="chip" data-filter="type:one">One-meal</button>
+          <button class="chip" data-filter="tag:breakfast">Breakfast</button>
+          <button class="chip" data-filter="tag:lunch">Lunch</button>
+          <button class="chip" data-filter="tag:dinner">Dinner</button>
+          <button class="chip" data-filter="tag:dessert">Dessert</button>
+          <button class="chip" data-filter="flag:thermomix">Thermomix</button>
+          <button class="chip" data-filter="flag:want">Want</button>
+          <button id="clearFiltersDrawer" class="chip ghost">Clear</button>
+        </div>
+      </div>
+      <div id="drawerBacklogList" class="list" aria-live="polite"></div>
+    `;
+    const filterPanel = document.createElement('div');
+    filterPanel.className = 'drawer-panel';
+    filterPanel.dataset.panel = 'filter';
+    filterPanel.innerHTML = `
+      <div class="drawer-form" style="padding:6px 12px 12px">
+        <h3>Type</h3>
+        <div class="row">
+          <label><input type="checkbox" class="dr-type" value="main"> Main</label>
+          <label><input type="checkbox" class="dr-type" value="side"> Side</label>
+          <label><input type="checkbox" class="dr-type" value="one"> One-meal</label>
+        </div>
+        <h3>Meal</h3>
+        <div class="row">
+          <label><input type="checkbox" class="dr-tag" value="breakfast"> Breakfast</label>
+          <label><input type="checkbox" class="dr-tag" value="lunch"> Lunch</label>
+          <label><input type="checkbox" class="dr-tag" value="dinner"> Dinner</label>
+          <label><input type="checkbox" class="dr-tag" value="dessert"> Dessert</label>
+        </div>
+        <h3>Flags</h3>
+        <div class="row">
+          <label><input type="checkbox" class="dr-flag" value="thermomix"> Thermomix</label>
+          <label><input type="checkbox" class="dr-flag" value="cooked"> Cooked before</label>
+          <label><input type="checkbox" class="dr-flag" value="want"> Want to cook</label>
+        </div>
+        <h3>Text contains</h3>
+        <input id="drawerText" type="search" placeholder="Name / ingredients / tags…" />
+        <div style="margin-top:8px; display:flex; gap:8px">
+          <button id="applyDrawerFilter" class="primary">Apply</button>
+          <button id="resetDrawerFilter" class="ghost">Reset</button>
+        </div>
+      </div>
+    `;
+
+    // Insert into sidebar (below handle)
+    const after = sidebar.querySelector('.drawer-handle');
+    if (after && after.nextSibling) sidebar.insertBefore(tabsBar, after.nextSibling);
+    else sidebar.prepend(tabsBar);
+    sidebar.appendChild(backlogPanel);
+    sidebar.appendChild(filterPanel);
+
+    // Tab switching
+    sidebar.addEventListener('click', (e) => {
+      const tab = e.target.closest('.drawer-tab'); if (!tab) return;
+      sidebar.querySelectorAll('.drawer-tab').forEach(t=>t.classList.toggle('active', t===tab));
+      sidebar.querySelectorAll('.drawer-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === tab.dataset.panel));
+    });
+
+    // Drawer filters
+    const drSearch = sidebar.querySelector('#drawerSearch');
+    const drChips = sidebar.querySelectorAll('#drawerChips .chip[data-filter]');
+    const drClear = sidebar.querySelector('#clearFiltersDrawer');
+    const drawerFilters = new Set();
+    function syncDrawerChips(){ drChips.forEach(ch => ch.classList.toggle('active', drawerFilters.has(ch.dataset.filter))); }
+    function toggleDrawerFilter(f){ drawerFilters.has(f) ? drawerFilters.delete(f) : drawerFilters.add(f); syncDrawerChips(); renderDrawerBacklog(); }
+    drChips.forEach(ch => ch.addEventListener('click', ()=> toggleDrawerFilter(ch.dataset.filter)));
+    drClear.addEventListener('click', ()=> { drawerFilters.clear(); syncDrawerChips(); renderDrawerBacklog(); });
+    drSearch.addEventListener('input', renderDrawerBacklog);
+
+    function filtersFromForm() {
+      const set = new Set();
+      sidebar.querySelectorAll('.dr-type:checked').forEach(cb => set.add(`type:${cb.value}`));
+      sidebar.querySelectorAll('.dr-tag:checked').forEach(cb => set.add(`tag:${cb.value}`));
+      sidebar.querySelectorAll('.dr-flag:checked').forEach(cb => set.add(`flag:${cb.value}`));
+      return set;
+    }
+    function renderDrawerBacklog() {
+      const listEl = sidebar.querySelector('#drawerBacklogList'); if (!listEl) return;
+      listEl.innerHTML = '';
+      const combined = new Set([...drawerFilters, ...filtersFromForm()]);
+      const text = (drSearch.value || sidebar.querySelector('#drawerText')?.value || '').trim();
+      const items = applyFilters(loadItems(), combined, text);
+      if (!items.length) { listEl.innerHTML = `<p style="color:var(--muted)">Nothing to show.<\/p>`; return; }
+      for (const it of items) {
+        const node = document.getElementById('miniCardTemplate').content.firstElementChild.cloneNode(true);
+        node.dataset.id = it.id;
+        node.querySelector('.dot').style.background = typeColor(it.type);
+        node.querySelector('.label').textContent = it.name;
+        node.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', JSON.stringify({kind:'backlog', id: it.id}));
+          e.dataTransfer.effectAllowed = 'copyMove';
+        });
+        listEl.appendChild(node);
+      }
+    }
+    sidebar.querySelector('#applyDrawerFilter').addEventListener('click', ()=> {
+      // Keep desktop sidebar filters in sync if needed
+      calendarFilters = filtersFromForm();
+      renderDrawerBacklog();
+    });
+    sidebar.querySelector('#resetDrawerFilter').addEventListener('click', ()=> {
+      sidebar.querySelectorAll('.dr-type, .dr-tag, .dr-flag').forEach(cb => cb.checked = false);
+      const dt = sidebar.querySelector('#drawerText'); if (dt) dt.value='';
+      renderDrawerBacklog();
+    });
+
+    renderDrawerBacklog();
+  }
+
+  function refreshMobileSuite() {
+    const onCalendar = document.querySelector('.tab.active')?.dataset.tab === 'calendar';
+    const m = window.matchMedia('(max-width: 980px)').matches;
+    if (m && onCalendar) {
       ensureHandle();
-      ensureFab().hidden = false;
+      ensureFabs();
+      ensureDrawerTabs();
       sidebar.classList.remove('hidden');
     } else {
-      if (fab) fab.hidden = true;
+      if (backlogFab) backlogFab.hidden = true;
+      if (addFab) addFab.hidden = true;
       sidebar.classList.remove('open');
     }
   }
-  mql.addEventListener('change', refresh);
-  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', refresh));
-  refresh();
-}
+
+  window.addEventListener('resize', refreshMobileSuite);
+  document.querySelectorAll('.tab').forEach(b => b.addEventListener('click', refreshMobileSuite));
+  document.addEventListener('DOMContentLoaded', refreshMobileSuite);
+})();
 
 // --- Tap a slot to add items (picker dialog) ---
-function installSlotPicker() {
-  const dlg = document.createElement('dialog');
-  dlg.id = 'slotPicker';
-  dlg.innerHTML = `
-    <form method="dialog" class="slot-picker">
-      <header class="dialog-header">
-        <h2>Add to <span id="slotPickerTarget"></span></h2>
-        <button type="button" class="icon" id="slotPickerClose" aria-label="Close">✕</button>
-      </header>
-      <div class="form">
-        <input id="slotPickerSearch" type="search" placeholder="Search…" aria-label="Search items to add" />
-        <div id="slotPickerList" class="picker-list list" aria-live="polite"></div>
-      </div>
-    </form>`;
-  document.body.appendChild(dlg);
-  const targetLbl = dlg.querySelector('#slotPickerTarget');
-  const listEl = dlg.querySelector('#slotPickerList');
-  const searchEl = dlg.querySelector('#slotPickerSearch');
-  dlg.querySelector('#slotPickerClose').addEventListener('click', ()=> dlg.close());
+(function installSlotPicker(){
+  document.addEventListener('DOMContentLoaded', () => {
+    if (document.getElementById('slotPicker')) return;
+    const dlg = document.createElement('dialog');
+    dlg.id = 'slotPicker';
+    dlg.innerHTML = `
+      <form method="dialog" class="slot-picker">
+        <header class="dialog-header">
+          <h2>Add to <span id="slotPickerTarget"></span></h2>
+          <button type="button" class="icon" id="slotPickerClose" aria-label="Close">✕</button>
+        </header>
+        <div class="form">
+          <input id="slotPickerSearch" type="search" placeholder="Search…" aria-label="Search items to add" />
+          <div id="slotPickerList" class="picker-list list" aria-live="polite"></div>
+        </div>
+        <footer class="dialog-footer">
+          <button type="button" class="ghost" id="slotPickerCancel">Cancel</button>
+        </footer>
+      </form>`;
+    document.body.appendChild(dlg);
+    const targetLbl = dlg.querySelector('#slotPickerTarget');
+    const listEl = dlg.querySelector('#slotPickerList');
+    const searchEl = dlg.querySelector('#slotPickerSearch');
+    dlg.querySelector('#slotPickerClose').addEventListener('click', ()=> dlg.close());
+    dlg.querySelector('#slotPickerCancel').addEventListener('click', ()=> dlg.close());
 
-  function renderList() {
-    const q = searchEl.value.trim();
-    const items = applyFilters(loadItems(), new Set(), q);
-    listEl.innerHTML = '';
-    if (!items.length) { listEl.innerHTML = `<p style="color:var(--muted)">No items match.</p>`; return; }
-    items.forEach(it => {
-      const row = document.createElement('div');
-      row.className = 'pick';
-      row.innerHTML = `<span class="dot" style="background:${typeColor(it.type)}"></span>
-        <span>${it.name}</span>
-        <button type="button" class="primary add">Add</button>`;
-      row.querySelector('.add').addEventListener('click', () => {
-        const schedule = loadSchedule();
-        const wk = dlg.dataset.week, day = dlg.dataset.day, slot = dlg.dataset.slot;
-        schedule[wk] = schedule[wk] || {};
-        schedule[wk][day] = schedule[wk][day] || {breakfast:[],lunch:[],dinner:[]};
-        schedule[wk][day][slot].push(it.id);
-        saveSchedule(schedule);
-        renderCalendarGrid();
-        dlg.close();
+    function renderList() {
+      const q = searchEl.value.trim();
+      const items = applyFilters(loadItems(), new Set(), q);
+      listEl.innerHTML = '';
+      if (!items.length) { listEl.innerHTML = `<p style="color:var(--muted)">No items match.</p>`; return; }
+      items.forEach(it => {
+        const row = document.createElement('div');
+        row.className = 'mini-card';
+        row.innerHTML = `<span class="dot" style="background:${typeColor(it.type)}"></span>
+          <span class="label">${it.name}</span>
+          <button type="button" class="primary add">Add</button>`;
+        row.querySelector('.add').addEventListener('click', () => {
+          const schedule = loadSchedule();
+          const wk = dlg.dataset.week, day = dlg.dataset.day, slot = dlg.dataset.slot;
+          schedule[wk] = schedule[wk] || {};
+          schedule[wk][day] = schedule[wk][day] || {breakfast:[],lunch:[],dinner:[]};
+          schedule[wk][day][slot].push(it.id);
+          saveSchedule(schedule);
+          renderCalendarGrid();
+          dlg.close();
+        });
+        listEl.appendChild(row);
       });
-      listEl.appendChild(row);
+    }
+    searchEl.addEventListener('input', renderList);
+
+    function openForSlot(slotEl) {
+      const names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+      targetLbl.textContent = `${names[+slotEl.dataset.day]} ${slotEl.dataset.slot}`;
+      dlg.dataset.week = slotEl.dataset.week;
+      dlg.dataset.day = slotEl.dataset.day;
+      dlg.dataset.slot = slotEl.dataset.slot;
+      searchEl.value = '';
+      renderList();
+      dlg.showModal();
+    }
+
+    // Event delegation: tap empty area in slot to open picker
+    document.addEventListener('click', (e) => {
+      const slotEl = e.target.closest('.slot');
+      if (!slotEl) return;
+      if (e.target.closest('.mini-card')) return; // ignore clicks on placed cards
+      openForSlot(slotEl);
     });
-  }
-  searchEl.addEventListener('input', renderList);
-
-  function openForSlot(slotEl) {
-    const names = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    targetLbl.textContent = `${names[+slotEl.dataset.day]} ${slotEl.dataset.slot}`;
-    dlg.dataset.week = slotEl.dataset.week;
-    dlg.dataset.day = slotEl.dataset.day;
-    dlg.dataset.slot = slotEl.dataset.slot;
-    searchEl.value = '';
-    renderList();
-    dlg.showModal();
-  }
-
-  // Event delegation: tap empty area in slot to open picker
-  document.addEventListener('click', (e) => {
-    const slotEl = e.target.closest('.slot');
-    if (!slotEl) return;
-    if (e.target.closest('.mini-card')) return; // ignore clicks on placed cards
-    openForSlot(slotEl);
   });
-}
+})();
 
-document.addEventListener('DOMContentLoaded', () => {
-  enableMobileDnD();
-  installMobileCalendarUI();
-  installSlotPicker();
-});
+// --- Week "Fit" toggle button in toolbar ---
+(function installWeekFitToggle(){
+  document.addEventListener('DOMContentLoaded', () => {
+    const bar = document.querySelector('.calendar-toolbar .week-controls');
+    if (!bar || document.getElementById('weekFitToggle')) return;
+    const btn = document.createElement('button');
+    btn.id = 'weekFitToggle'; btn.className = 'chip ghost';
+    function apply(compact) {
+      const cal = document.querySelector('.calendar');
+      if (cal) cal.classList.toggle('compact', !!compact);
+      localStorage.setItem('rb_week_compact', compact ? '1':'0');
+      btn.textContent = compact ? 'Comfort view' : 'Fit week';
+      btn.title = compact ? 'Show larger, scrollable columns' : 'Fit all 7 days on screen';
+    }
+    const saved = localStorage.getItem('rb_week_compact') === '1';
+    apply(saved);
+    btn.addEventListener('click', () => {
+      const cal = document.querySelector('.calendar');
+      const now = !(cal && cal.classList.contains('compact'));
+      apply(now);
+    });
+    bar.appendChild(btn);
+  });
+})();
 
 </script>
 </body>

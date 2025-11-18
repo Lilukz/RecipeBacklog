@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -226,6 +227,23 @@ dialog::backdrop { background: rgba(5,8,12,.6); backdrop-filter: blur(2px); }
 }
 
 .hidden { display: none !important; }
+
+
+/* ===== Mobile Drag & Drop support (pointer events) ===== */
+@media (pointer: coarse) {
+  .mini-card { touch-action: none; } /* prevent touch scrolling during drag */
+}
+.drag-ghost {
+  position: fixed;
+  z-index: 10000;
+  pointer-events: none;
+  opacity: .95;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  border-radius: 10px;
+}
+/* smoother scrolling in sidebars on iOS, and better viewport height on mobile */
+.sidebar { -webkit-overflow-scrolling: touch; height: calc(100dvh - 220px); }
 
 </style>
 </head>
@@ -949,6 +967,148 @@ function runAdvancedFilter() {
 // --------- Initial render ----------
 function renderAll() { renderBacklog(); if ($('#view-calendar').classList.contains('active')) renderCalendar(); runAdvancedFilter(); }
 document.addEventListener('DOMContentLoaded', () => { renderBacklog(); runAdvancedFilter(); updateToggleViewBtn(); });
+
+
+// ===== Mobile-friendly drag & drop (touch devices) =====
+// Uses Pointer Events to emulate drag from backlog/sidebar into calendar slots
+function dropDataIntoSlot(data, slotEl, clientY) {
+  const schedule = loadSchedule();
+  const weekKey = slotEl.dataset.week;
+  schedule[weekKey] = schedule[weekKey] || {};
+  schedule[weekKey][slotEl.dataset.day] = schedule[weekKey][slotEl.dataset.day] || {breakfast:[],lunch:[],dinner:[]};
+
+  // Compute insertion index relative to existing mini-cards
+  const insertIndex = getInsertIndex(slotEl, clientY);
+  const targetArr = schedule[weekKey][slotEl.dataset.day][slotEl.dataset.slot];
+
+  if (data.kind === 'backlog') {
+    targetArr.splice(insertIndex, 0, data.id);
+  } else if (data.kind === 'calendar') {
+    const fromArr = (schedule[data.week][data.day][data.slot])||[];
+    const fromIdx = fromArr.indexOf(data.id);
+    if (fromIdx >= 0) fromArr.splice(fromIdx,1);
+    let adjustedIndex = insertIndex;
+    if (data.week===weekKey && data.day===slotEl.dataset.day && data.slot===slotEl.dataset.slot && fromIdx >=0 && fromIdx < insertIndex) {
+      adjustedIndex = insertIndex - 1;
+    }
+    targetArr.splice(adjustedIndex, 0, data.id);
+  }
+
+  saveSchedule(schedule);
+  renderCalendarGrid();
+}
+function getSlotFromPoint(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return el ? el.closest('.slot') : null;
+}
+
+// Lightweight event delegation for touch dragging of .mini-card
+(function enableMobileDnD(){
+  const coarse = window.matchMedia ? window.matchMedia('(pointer: coarse)').matches : ('ontouchstart' in window);
+  if (!coarse) return; // only run on touch / coarse pointers
+
+  let dragging = false;
+  let ghost = null;
+  let currentSlot = null;
+  let startX = 0, startY = 0;
+  let originData = null;
+  let pressTimer = null;
+  let scrollTimer = null;
+  let sourceNode = null;
+
+  function updateGhost(x, y) {
+    if (!ghost) return;
+    ghost.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+  }
+  function updateAutoScroll(y) {
+    const margin = 60;
+    clearInterval(scrollTimer);
+    if (y < margin) scrollTimer = setInterval(()=>window.scrollBy(0, -12), 16);
+    else if (y > window.innerHeight - margin) scrollTimer = setInterval(()=>window.scrollBy(0, 12), 16);
+  }
+  function stopAutoScroll(){ clearInterval(scrollTimer); }
+
+  function makeDataForNode(node){
+    const inSidebar = !!node.closest('#calendarSidebar');
+    const inSlot = node.closest('.slot');
+    const id = node.dataset.id;
+    if (!id) return null;
+    if (inSidebar) return { kind: 'backlog', id };
+    if (inSlot) {
+      const slotEl = inSlot;
+      return { kind:'calendar', id, week: slotEl.dataset.week, day: slotEl.dataset.day, slot: slotEl.dataset.slot };
+    }
+    return null;
+  }
+
+  function onPointerDown(e){
+    const node = e.target.closest('.mini-card');
+    if (!node) return;
+    if (e.pointerType !== 'touch') return; // don't conflict with desktop DnD
+    if (e.target.closest('.remove')) return; // allow tapping remove
+    originData = makeDataForNode(node);
+    if (!originData) return;
+
+    sourceNode = node;
+    startX = e.clientX; startY = e.clientY;
+
+    const startDrag = (ev) => {
+      if (dragging) return;
+      dragging = true;
+      ghost = node.cloneNode(true);
+      ghost.classList.add('drag-ghost');
+      const rect = node.getBoundingClientRect();
+      ghost.style.width = rect.width + 'px';
+      document.body.appendChild(ghost);
+      node.classList.add('dragging');
+      node.style.opacity = '.35';
+      updateGhost(ev.clientX, ev.clientY);
+      document.addEventListener('pointermove', onPointerMove);
+      document.addEventListener('pointerup', onPointerUp, { once: true });
+    };
+
+    const onPointerMove = (ev) => {
+      const dx = Math.abs(ev.clientX - startX), dy = Math.abs(ev.clientY - startY);
+      if (!dragging && (dx + dy > 6)) startDrag(ev); // small movement starts the drag
+      if (!dragging) return;
+      updateGhost(ev.clientX, ev.clientY);
+      const slot = getSlotFromPoint(ev.clientX, ev.clientY);
+      if (currentSlot !== slot) {
+        if (currentSlot) currentSlot.classList.remove('over');
+        if (slot) slot.classList.add('over');
+        currentSlot = slot;
+      }
+      updateAutoScroll(ev.clientY);
+    };
+
+    const onPointerUp = (ev) => {
+      clearTimeout(pressTimer);
+      stopAutoScroll();
+      document.removeEventListener('pointermove', onPointerMove);
+      if (dragging) {
+        if (currentSlot) {
+          dropDataIntoSlot(originData, currentSlot, ev.clientY);
+          currentSlot.classList.remove('over');
+        }
+        if (ghost) ghost.remove();
+        node.classList.remove('dragging');
+        node.style.opacity = '';
+      }
+      dragging = false;
+      currentSlot = null;
+      ghost = null;
+      sourceNode = null;
+      originData = null;
+    };
+
+    // long-press safety: if user holds for a bit without moving, start the drag
+    pressTimer = setTimeout(() => startDrag(e), 140);
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp, { once: true });
+  }
+
+  document.addEventListener('pointerdown', onPointerDown);
+})();
 
 </script>
 </body>
